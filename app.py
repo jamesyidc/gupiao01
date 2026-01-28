@@ -326,6 +326,329 @@ def health_check():
     })
 
 
+@app.route('/api/data/submit', methods=['POST'])
+def submit_data():
+    """
+    提交涨停数据
+    
+    请求体:
+    {
+        "date": "2026-01-28",
+        "theme": "人工智能",
+        "stocks": [
+            {
+                "code": "000001",
+                "name": "平安银行",
+                "reason": "AI概念爆发",
+                "limit_up_time": "09:30",
+                "open_count": 0
+            },
+            ...
+        ]
+    }
+    
+    返回:
+    {
+        "success": true,
+        "message": "成功提交3条涨停记录"
+    }
+    """
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': '请求体不能为空'
+            }), 400
+        
+        # 验证必需字段
+        date_str = data.get('date')
+        theme_name = data.get('theme')
+        stocks = data.get('stocks', [])
+        
+        if not date_str or not theme_name:
+            return jsonify({
+                'success': False,
+                'error': '缺少必需字段: date 和 theme'
+            }), 400
+        
+        if not stocks or not isinstance(stocks, list):
+            return jsonify({
+                'success': False,
+                'error': 'stocks 必须是非空数组'
+            }), 400
+        
+        # 验证日期格式
+        try:
+            trade_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({
+                'success': False,
+                'error': '日期格式错误，应为 YYYY-MM-DD'
+            }), 400
+        
+        # 导入数据
+        from models import Stock, Theme, LimitUpRecord
+        session = db.get_session()
+        
+        # 获取或创建题材
+        theme = session.query(Theme).filter(Theme.name == theme_name).first()
+        if not theme:
+            theme = Theme(name=theme_name, description=f'手动添加的题材：{theme_name}')
+            session.add(theme)
+            session.commit()
+        
+        success_count = 0
+        error_list = []
+        
+        for stock_data in stocks:
+            try:
+                stock_code = stock_data.get('code')
+                stock_name = stock_data.get('name')
+                
+                if not stock_code:
+                    error_list.append('股票代码不能为空')
+                    continue
+                
+                # 获取或创建股票
+                stock = session.query(Stock).filter(Stock.code == stock_code).first()
+                if not stock:
+                    if not stock_name:
+                        error_list.append(f'股票{stock_code}不存在，且未提供股票名称')
+                        continue
+                    
+                    # 创建新股票
+                    market = 'SZ' if stock_code.startswith('0') or stock_code.startswith('3') else 'SH'
+                    stock = Stock(code=stock_code, name=stock_name, market=market)
+                    session.add(stock)
+                    session.commit()
+                
+                # 检查是否已存在该涨停记录
+                existing = session.query(LimitUpRecord).filter(
+                    LimitUpRecord.stock_id == stock.id,
+                    LimitUpRecord.theme_id == theme.id,
+                    LimitUpRecord.trade_date == trade_date
+                ).first()
+                
+                if existing:
+                    error_list.append(f'股票{stock_code}在{date_str}的{theme_name}题材涨停记录已存在')
+                    continue
+                
+                # 创建涨停记录
+                limit_up = LimitUpRecord(
+                    stock_id=stock.id,
+                    theme_id=theme.id,
+                    trade_date=trade_date,
+                    reason=stock_data.get('reason', ''),
+                    limit_up_time=stock_data.get('limit_up_time'),
+                    open_count=stock_data.get('open_count', 0),
+                    turnover_rate=stock_data.get('turnover_rate')
+                )
+                session.add(limit_up)
+                success_count += 1
+                
+            except Exception as e:
+                error_list.append(f'处理股票{stock_data.get("code", "unknown")}时出错: {str(e)}')
+                continue
+        
+        # 提交事务
+        session.commit()
+        session.close()
+        
+        result = {
+            'success': True,
+            'message': f'成功提交{success_count}条涨停记录',
+            'success_count': success_count,
+            'total_count': len(stocks)
+        }
+        
+        if error_list:
+            result['errors'] = error_list
+            result['error_count'] = len(error_list)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/data/add-stock', methods=['POST'])
+def add_stock():
+    """
+    添加单个股票基本信息
+    
+    请求体:
+    {
+        "code": "000001",
+        "name": "平安银行",
+        "market": "SZ"
+    }
+    """
+    try:
+        data = request.get_json()
+        
+        code = data.get('code')
+        name = data.get('name')
+        market = data.get('market', 'SZ')
+        
+        if not code or not name:
+            return jsonify({
+                'success': False,
+                'error': '缺少必需字段: code 和 name'
+            }), 400
+        
+        from models import Stock
+        session = db.get_session()
+        
+        # 检查是否已存在
+        existing = session.query(Stock).filter(Stock.code == code).first()
+        if existing:
+            session.close()
+            return jsonify({
+                'success': False,
+                'error': f'股票{code}已存在'
+            }), 400
+        
+        # 创建股票
+        stock = Stock(code=code, name=name, market=market)
+        session.add(stock)
+        session.commit()
+        session.close()
+        
+        return jsonify({
+            'success': True,
+            'message': f'成功添加股票{code} - {name}'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/data/add-theme', methods=['POST'])
+def add_theme():
+    """
+    添加题材
+    
+    请求体:
+    {
+        "name": "量子计算",
+        "description": "量子计算相关概念"
+    }
+    """
+    try:
+        data = request.get_json()
+        
+        name = data.get('name')
+        description = data.get('description', '')
+        
+        if not name:
+            return jsonify({
+                'success': False,
+                'error': '缺少必需字段: name'
+            }), 400
+        
+        from models import Theme
+        session = db.get_session()
+        
+        # 检查是否已存在
+        existing = session.query(Theme).filter(Theme.name == name).first()
+        if existing:
+            session.close()
+            return jsonify({
+                'success': False,
+                'error': f'题材{name}已存在'
+            }), 400
+        
+        # 创建题材
+        theme = Theme(name=name, description=description)
+        session.add(theme)
+        session.commit()
+        session.close()
+        
+        return jsonify({
+            'success': True,
+            'message': f'成功添加题材{name}'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/data/themes', methods=['GET'])
+def get_themes():
+    """获取所有题材列表"""
+    try:
+        from models import Theme
+        session = db.get_session()
+        
+        themes = session.query(Theme).all()
+        
+        result = [
+            {
+                'id': theme.id,
+                'name': theme.name,
+                'description': theme.description
+            }
+            for theme in themes
+        ]
+        
+        session.close()
+        
+        return jsonify({
+            'success': True,
+            'data': result
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/data/stocks', methods=['GET'])
+def get_stocks():
+    """获取所有股票列表"""
+    try:
+        from models import Stock
+        session = db.get_session()
+        
+        stocks = session.query(Stock).all()
+        
+        result = [
+            {
+                'id': stock.id,
+                'code': stock.code,
+                'name': stock.name,
+                'market': stock.market
+            }
+            for stock in stocks
+        ]
+        
+        session.close()
+        
+        return jsonify({
+            'success': True,
+            'data': result
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 if __name__ == '__main__':
     # 初始化数据库
     db.create_tables()
