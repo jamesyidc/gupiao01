@@ -19,12 +19,39 @@
    - 判断个股相对于题材的强弱状态
    - 识别是否为题材成分股
 
+4. **Web可视化界面**
+   - 题材分析：查看成分股列表和位置分布图
+   - 对比分析：个股与题材相对强弱对比
+   - Chart.js图表可视化
+   - 响应式设计，适配PC和移动端
+
+5. **批量数据录入**
+   - 只需输入股票代码（6位数字）
+   - 股票名称自动补全
+   - 支持从Excel粘贴批量代码
+   - 每行一个代码，一次提交多只股票
+
+6. **操作日志管理**
+   - 记录所有添加和删除操作
+   - 显示操作时间和IP地址
+   - 支持删除日志并回滚数据
+   - 涨停记录查询（按题材、日期、股票筛选）
+   - 单条删除和批量删除功能
+
 ## 技术栈
 
 - **后端框架**: Flask 3.0.0
 - **数据库**: SQLite + SQLAlchemy
 - **数据处理**: Pandas + NumPy
 - **API**: RESTful API with CORS support
+
+## 快速访问
+
+**🌐 在线访问**：https://5000-i1m9fpfr5tksghv87yttz-a402f90a.sandbox.novita.ai
+
+**📚 完整文档**：查看 [SYSTEM_SUMMARY.md](SYSTEM_SUMMARY.md) 获取完整系统说明
+
+---
 
 ## 快速开始
 
@@ -265,9 +292,26 @@ webapp/
 ├── analyzer.py            # 核心分析算法
 ├── app.py                 # Flask API接口
 ├── data_importer.py       # 数据导入工具
+├── example_usage.py       # API使用示例
+├── submit_example.py      # 数据提交示例
 ├── requirements.txt       # Python依赖
 ├── .gitignore            # Git忽略文件
-└── README.md             # 项目文档
+├── static/               # 静态资源
+│   ├── app.js           # 前端JavaScript
+│   └── style.css        # 前端样式
+├── templates/           # HTML模板
+│   └── index.html       # 主页面
+└── docs/                # 文档
+    ├── README.md               # 项目总览
+    ├── SYSTEM_SUMMARY.md       # 系统完整总结
+    ├── QUICK_START.md          # 快速开始指南
+    ├── API_TEST.md             # API测试文档
+    ├── FRONTEND_GUIDE.md       # 前端使用指南
+    ├── DATA_SUBMIT_API.md      # 数据提交API文档
+    ├── BATCH_INPUT_GUIDE.md    # 批量输入使用指南
+    ├── HOW_TO_ADD_DATA.md      # 数据录入教程
+    ├── OPERATION_LOGS.md       # 操作日志演示
+    └── LOG_DISPLAY_UPDATE.md   # 日志显示优化说明
 ```
 
 ## 开发计划
@@ -278,12 +322,20 @@ webapp/
 - ✅ 位置百分比计算算法
 - ✅ RESTful API接口
 - ✅ 模拟数据生成工具
+- ✅ Web可视化界面
+- ✅ 批量数据录入（只需输入代码，名称自动补全）
+- ✅ 操作日志管理（添加/删除/回滚）
+- ✅ 涨停记录查询（按题材、日期、股票筛选）
+- ✅ Chart.js图表可视化
+- ✅ 响应式设计
 
 ### 待扩展功能
 - ⏳ 真实股票数据接入（Tushare/AKShare）
-- ⏳ Web前端界面
+- ✅ Web前端界面（已完成）
+- ✅ 批量数据录入（已完成）
+- ✅ 操作日志管理（已完成）
+- ✅ 可视化图表（Chart.js，已完成）
 - ⏳ 历史回测功能
-- ⏳ 可视化图表
 - ⏳ 导出Excel报告
 
 ## 使用示例
