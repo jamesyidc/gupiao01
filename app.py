@@ -5,7 +5,8 @@ from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from datetime import datetime
 from analyzer import StockAnalyzer
-from models import db
+from models import db, Stock, Theme, LimitUpRecord, DailyPrice, OperationLog
+import json
 
 app = Flask(__name__)
 CORS(app)  # 允许跨域请求
@@ -373,7 +374,8 @@ def submit_batch_codes():
             }), 400
         
         # 导入数据
-        from models import Stock, Theme, LimitUpRecord
+        from models import Stock, Theme, LimitUpRecord, OperationLog
+        import json
         session = db.get_session()
         
         # 获取或创建题材
@@ -386,6 +388,7 @@ def submit_batch_codes():
         success_count = 0
         error_list = []
         details = []
+        added_record_ids = []  # 记录成功添加的记录ID
         
         # 这里简化处理，实际应该接入股票API查询
         # 暂时使用虚拟名称
@@ -455,6 +458,8 @@ def submit_batch_codes():
                     open_count=0
                 )
                 session.add(limit_up)
+                session.flush()  # 获取ID
+                added_record_ids.append(limit_up.id)
                 success_count += 1
                 details[-1]['status'] = '✅ 成功'
                 
@@ -466,6 +471,26 @@ def submit_batch_codes():
         
         # 提交事务
         session.commit()
+        
+        # 记录操作日志
+        if success_count > 0:
+            log_details = {
+                'theme': theme_name,
+                'date': date_str,
+                'stock_count': success_count,
+                'stock_codes': [d['code'] for d in details if '成功' in d['status']],
+                'record_ids': added_record_ids
+            }
+            operation_log = OperationLog(
+                operation_type='add',
+                target_type='limit_up_record',
+                target_id=None,
+                details=json.dumps(log_details, ensure_ascii=False),
+                ip_address=request.remote_addr
+            )
+            session.add(operation_log)
+            session.commit()
+        
         session.close()
         
         result = {
@@ -803,6 +828,386 @@ def get_stocks():
         return jsonify({
             'success': True,
             'data': result
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/logs/limit-up-records', methods=['GET'])
+def get_limit_up_records():
+    """
+    获取涨停记录（用于删除管理）
+    
+    参数:
+        theme: 题材名称筛选
+        date: 日期筛选 YYYY-MM-DD
+        stock_code: 股票代码筛选
+        limit: 返回数量，默认100
+    """
+    try:
+        from models import LimitUpRecord, Stock, Theme
+        
+        theme_name = request.args.get('theme')
+        date_str = request.args.get('date')
+        stock_code = request.args.get('stock_code')
+        limit = int(request.args.get('limit', 100))
+        
+        session = db.get_session()
+        
+        query = session.query(
+            LimitUpRecord.id,
+            LimitUpRecord.trade_date,
+            Stock.code.label('stock_code'),
+            Stock.name.label('stock_name'),
+            Theme.name.label('theme_name'),
+            LimitUpRecord.reason,
+            LimitUpRecord.limit_up_time,
+            LimitUpRecord.open_count
+        ).join(
+            Stock, LimitUpRecord.stock_id == Stock.id
+        ).join(
+            Theme, LimitUpRecord.theme_id == Theme.id
+        )
+        
+        # 筛选条件
+        if theme_name:
+            query = query.filter(Theme.name == theme_name)
+        
+        if date_str:
+            try:
+                filter_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+                query = query.filter(LimitUpRecord.trade_date == filter_date)
+            except ValueError:
+                pass
+        
+        if stock_code:
+            query = query.filter(Stock.code == stock_code)
+        
+        records = query.order_by(
+            LimitUpRecord.trade_date.desc(),
+            Stock.code
+        ).limit(limit).all()
+        
+        result = []
+        for record in records:
+            result.append({
+                'id': record.id,
+                'trade_date': record.trade_date.strftime('%Y-%m-%d'),
+                'stock_code': record.stock_code,
+                'stock_name': record.stock_name,
+                'theme_name': record.theme_name,
+                'reason': record.reason,
+                'limit_up_time': record.limit_up_time,
+                'open_count': record.open_count
+            })
+        
+        session.close()
+        
+        return jsonify({
+            'success': True,
+            'data': result,
+            'total': len(result)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/logs/delete-record/<int:record_id>', methods=['DELETE'])
+def delete_limit_up_record(record_id):
+    """
+    删除涨停记录
+    
+    参数:
+        record_id: 记录ID
+    """
+    try:
+        from models import LimitUpRecord, Stock, Theme, OperationLog
+        import json
+        
+        session = db.get_session()
+        
+        # 查找记录
+        record = session.query(LimitUpRecord).filter(
+            LimitUpRecord.id == record_id
+        ).first()
+        
+        if not record:
+            session.close()
+            return jsonify({
+                'success': False,
+                'error': '记录不存在'
+            }), 404
+        
+        # 获取股票和题材信息用于日志
+        stock = session.query(Stock).filter(Stock.id == record.stock_id).first()
+        theme = session.query(Theme).filter(Theme.id == record.theme_id).first()
+        
+        # 记录删除日志
+        log_details = {
+            'stock_code': stock.code if stock else '',
+            'stock_name': stock.name if stock else '',
+            'theme_name': theme.name if theme else '',
+            'trade_date': record.trade_date.strftime('%Y-%m-%d'),
+            'reason': record.reason
+        }
+        
+        operation_log = OperationLog(
+            operation_type='delete',
+            target_type='limit_up_record',
+            target_id=record_id,
+            details=json.dumps(log_details, ensure_ascii=False),
+            ip_address=request.remote_addr
+        )
+        session.add(operation_log)
+        
+        # 删除记录
+        session.delete(record)
+        session.commit()
+        session.close()
+        
+        return jsonify({
+            'success': True,
+            'message': f'成功删除涨停记录：{log_details["stock_code"]} {log_details["stock_name"]}'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/logs/batch-delete', methods=['POST'])
+def batch_delete_records():
+    """
+    批量删除涨停记录
+    
+    请求体:
+    {
+        "record_ids": [1, 2, 3]
+    }
+    """
+    try:
+        from models import LimitUpRecord, Stock, Theme, OperationLog
+        import json
+        
+        data = request.get_json()
+        record_ids = data.get('record_ids', [])
+        
+        if not record_ids:
+            return jsonify({
+                'success': False,
+                'error': '未提供要删除的记录ID'
+            }), 400
+        
+        session = db.get_session()
+        
+        deleted_count = 0
+        deleted_details = []
+        
+        for record_id in record_ids:
+            record = session.query(LimitUpRecord).filter(
+                LimitUpRecord.id == record_id
+            ).first()
+            
+            if record:
+                # 获取详细信息
+                stock = session.query(Stock).filter(Stock.id == record.stock_id).first()
+                theme = session.query(Theme).filter(Theme.id == record.theme_id).first()
+                
+                log_details = {
+                    'stock_code': stock.code if stock else '',
+                    'stock_name': stock.name if stock else '',
+                    'theme_name': theme.name if theme else '',
+                    'trade_date': record.trade_date.strftime('%Y-%m-%d')
+                }
+                
+                deleted_details.append(log_details)
+                
+                # 记录日志
+                operation_log = OperationLog(
+                    operation_type='delete',
+                    target_type='limit_up_record',
+                    target_id=record_id,
+                    details=json.dumps(log_details, ensure_ascii=False),
+                    ip_address=request.remote_addr
+                )
+                session.add(operation_log)
+                
+                # 删除记录
+                session.delete(record)
+                deleted_count += 1
+        
+        session.commit()
+        session.close()
+        
+        return jsonify({
+            'success': True,
+            'message': f'成功删除{deleted_count}条记录',
+            'deleted_count': deleted_count,
+            'details': deleted_details
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/logs', methods=['GET'])
+def get_operation_logs():
+    """
+    获取操作日志列表
+    
+    参数:
+        page: 页码，默认1
+        page_size: 每页条数，默认20
+        operation_type: 操作类型过滤 (add/delete/update)
+        target_type: 目标类型过滤 (limit_up_record/stock/theme)
+    
+    返回:
+        {
+            "success": true,
+            "data": [
+                {
+                    "id": 1,
+                    "operation_type": "add",
+                    "operation_time": "2026-01-28 10:00:00",
+                    "target_type": "limit_up_record",
+                    "details": {...},
+                    "ip_address": "127.0.0.1"
+                }
+            ],
+            "total": 100,
+            "page": 1,
+            "page_size": 20
+        }
+    """
+    try:
+        page = int(request.args.get('page', 1))
+        page_size = int(request.args.get('page_size', 20))
+        operation_type = request.args.get('operation_type')
+        target_type = request.args.get('target_type')
+        
+        session = db.get_session()
+        query = session.query(OperationLog)
+        
+        # 过滤条件
+        if operation_type:
+            query = query.filter(OperationLog.operation_type == operation_type)
+        if target_type:
+            query = query.filter(OperationLog.target_type == target_type)
+        
+        # 获取总数
+        total = query.count()
+        
+        # 分页查询（按时间倒序）
+        logs = query.order_by(OperationLog.operation_time.desc()) \
+                   .offset((page - 1) * page_size) \
+                   .limit(page_size) \
+                   .all()
+        
+        result = []
+        for log in logs:
+            result.append({
+                'id': log.id,
+                'operation_type': log.operation_type,
+                'operation_time': log.operation_time.strftime('%Y-%m-%d %H:%M:%S'),
+                'target_type': log.target_type,
+                'target_id': log.target_id,
+                'details': json.loads(log.details) if log.details else {},
+                'ip_address': log.ip_address
+            })
+        
+        session.close()
+        
+        return jsonify({
+            'success': True,
+            'data': result,
+            'total': total,
+            'page': page,
+            'page_size': page_size,
+            'total_pages': (total + page_size - 1) // page_size
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/logs/<int:log_id>', methods=['DELETE'])
+def delete_operation_log(log_id):
+    """
+    删除操作日志并回滚对应的数据修改（用于纠错）
+    
+    参数:
+        log_id: 日志ID
+    
+    返回:
+        {
+            "success": true,
+            "message": "日志删除成功，已回滚3条涨停记录",
+            "rollback_count": 3
+        }
+    """
+    try:
+        session = db.get_session()
+        
+        # 查找日志
+        log = session.query(OperationLog).filter(OperationLog.id == log_id).first()
+        if not log:
+            session.close()
+            return jsonify({
+                'success': False,
+                'error': '日志不存在'
+            }), 404
+        
+        rollback_count = 0
+        rollback_info = []
+        
+        # 根据日志类型进行回滚
+        if log.operation_type == 'add' and log.target_type == 'limit_up_record':
+            # 解析日志详情
+            details = json.loads(log.details) if log.details else {}
+            record_ids = details.get('record_ids', [])
+            
+            # 删除添加的涨停记录
+            for record_id in record_ids:
+                record = session.query(LimitUpRecord).filter(LimitUpRecord.id == record_id).first()
+                if record:
+                    stock_code = record.stock.code
+                    theme_name = record.theme.name
+                    trade_date = record.trade_date.strftime('%Y-%m-%d')
+                    
+                    session.delete(record)
+                    rollback_count += 1
+                    rollback_info.append(f'{stock_code}({theme_name},{trade_date})')
+        
+        # 删除日志记录
+        session.delete(log)
+        session.commit()
+        session.close()
+        
+        message = f'日志删除成功'
+        if rollback_count > 0:
+            message += f'，已回滚{rollback_count}条涨停记录'
+        
+        return jsonify({
+            'success': True,
+            'message': message,
+            'rollback_count': rollback_count,
+            'rollback_info': rollback_info
         })
         
     except Exception as e:

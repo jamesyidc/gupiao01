@@ -85,6 +85,23 @@ class LimitUpRecord(Base):
     )
 
 
+class OperationLog(Base):
+    """操作日志表"""
+    __tablename__ = 'operation_logs'
+    
+    id = Column(Integer, primary_key=True)
+    operation_type = Column(String(50), nullable=False)  # 操作类型：add/delete/update
+    operation_time = Column(DateTime, default=datetime.now, index=True)  # 操作时间
+    target_type = Column(String(50))  # 目标类型：limit_up_record/stock/theme
+    target_id = Column(Integer)  # 目标ID
+    details = Column(String(1000))  # 操作详情JSON
+    ip_address = Column(String(50))  # IP地址
+    
+    __table_args__ = (
+        Index('idx_operation_time', 'operation_time'),
+    )
+
+
 class Database:
     """数据库管理类"""
     

@@ -57,6 +57,9 @@
                         <button id="btn-add-data" class="btn btn-warning">
                             ➕ 录入数据
                         </button>
+                        <button id="btn-view-logs" class="btn btn-info">
+                            📋 操作日志
+                        </button>
                         <button id="btn-clear" class="btn btn-secondary">
                             清空结果
                         </button>
@@ -268,6 +271,85 @@
 
                         <!-- 提交结果提示 -->
                         <div id="submit-result" style="display: none; margin-top: 20px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 操作日志模态框 -->
+            <div id="logs-modal" class="modal" style="display: none;">
+                <div class="modal-content modal-large">
+                    <div class="modal-header">
+                        <h3>📋 操作日志与数据管理</h3>
+                        <button id="logs-modal-close" class="btn-close">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <!-- 筛选条件 -->
+                        <div class="filter-section">
+                            <div class="filter-row">
+                                <div class="form-group-inline">
+                                    <label>题材:</label>
+                                    <input type="text" id="filter-theme" class="form-control-small" placeholder="题材名称">
+                                </div>
+                                <div class="form-group-inline">
+                                    <label>日期:</label>
+                                    <input type="date" id="filter-date" class="form-control-small">
+                                </div>
+                                <div class="form-group-inline">
+                                    <label>股票代码:</label>
+                                    <input type="text" id="filter-stock" class="form-control-small" placeholder="000001">
+                                </div>
+                                <button id="btn-filter-records" class="btn btn-small btn-primary">🔍 查询</button>
+                                <button id="btn-clear-filter" class="btn btn-small btn-secondary">清空</button>
+                            </div>
+                        </div>
+
+                        <!-- 记录列表 -->
+                        <div class="records-section">
+                            <div class="records-header">
+                                <h4>涨停记录列表</h4>
+                                <div class="bulk-actions">
+                                    <button id="btn-select-all" class="btn btn-small btn-secondary">全选</button>
+                                    <button id="btn-delete-selected" class="btn btn-small btn-danger">删除选中</button>
+                                </div>
+                            </div>
+                            
+                            <div id="records-loading" style="display: none; text-align: center; padding: 20px;">
+                                <div class="spinner" style="margin: 0 auto;"></div>
+                                <p>加载中...</p>
+                            </div>
+
+                            <div id="records-table-container">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th width="40"><input type="checkbox" id="select-all-checkbox"></th>
+                                            <th>日期</th>
+                                            <th>股票代码</th>
+                                            <th>股票名称</th>
+                                            <th>题材</th>
+                                            <th>涨停原因</th>
+                                            <th>封板时间</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="records-tbody">
+                                        <tr>
+                                            <td colspan="8" style="text-align: center; padding: 40px;">
+                                                点击"查询"加载数据
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- 操作日志 -->
+                        <div class="logs-section">
+                            <h4>最近操作日志（前20条）</h4>
+                            <div id="operation-logs-list">
+                                <p style="text-align: center; padding: 20px;">加载中...</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

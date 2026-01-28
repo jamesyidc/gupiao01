@@ -556,6 +556,10 @@ body {
     box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1);
 }
 
+.modal-large {
+    max-width: 1200px;
+}
+
 .modal-header {
     display: flex;
     justify-content: space-between;
@@ -706,6 +710,194 @@ body {
     border: 1px solid #fecaca;
     border-radius: 8px;
     color: #991b1b;
+}
+
+/* 筛选区域 */
+.filter-section {
+    margin-bottom: 20px;
+    padding: 20px;
+    background: var(--background);
+    border-radius: 8px;
+}
+
+.filter-row {
+    display: flex;
+    gap: 15px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+
+.form-group-inline {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.form-group-inline label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.form-control-small {
+    padding: 8px 12px;
+    border: 2px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.95rem;
+    min-width: 140px;
+}
+
+.form-control-small:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+/* 记录管理 */
+.records-section {
+    margin-bottom: 30px;
+}
+
+.records-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.records-header h4 {
+    margin: 0;
+}
+
+.bulk-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.btn-danger {
+    background: var(--danger-color);
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #dc2626;
+}
+
+.btn-info {
+    background: #0ea5e9;
+    color: white;
+}
+
+.btn-info:hover {
+    background: #0284c7;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+}
+
+/* 日志列表 */
+.logs-section {
+    margin-top: 30px;
+    padding: 20px;
+    background: var(--background);
+    border-radius: 8px;
+}
+
+.logs-section h4 {
+    margin-bottom: 15px;
+}
+
+.log-item {
+    padding: 15px;
+    background: white;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    border-left: 4px solid var(--primary-color);
+}
+
+.log-item.log-add {
+    border-left-color: var(--success-color);
+}
+
+.log-item.log-delete {
+    border-left-color: var(--danger-color);
+}
+
+.log-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.log-type {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.log-type.type-add {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.log-type.type-delete {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.log-time {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.log-details {
+    font-size: 0.95rem;
+    color: var(--text-primary);
+}
+
+.log-ip {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-top: 5px;
+}
+
+.btn-delete-log {
+    padding: 4px 10px;
+    font-size: 0.85rem;
+    background: var(--danger-color);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.btn-delete-log:hover {
+    background: #c62828;
+}
+
+/* 通知样式 */
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOut {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
 }
 
 /* 页脚（原有） */
