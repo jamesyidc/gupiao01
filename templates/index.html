@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>股票数据研究系统</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <header class="header">
+            <div class="header-content">
+                <h1>📊 股票数据研究系统</h1>
+                <p class="subtitle">基于涨停数据的题材与个股位置分析</p>
+            </div>
+        </header>
+
+        <!-- 主要内容 -->
+        <main class="main-content">
+            <!-- 控制面板 -->
+            <section class="control-panel">
+                <div class="panel-header">
+                    <h2>🎯 分析参数</h2>
+                </div>
+                <div class="panel-body">
+                    <div class="form-group">
+                        <label for="theme-select">选择题材：</label>
+                        <select id="theme-select" class="form-control">
+                            <option value="">-- 请选择题材 --</option>
+                            <option value="人工智能">人工智能</option>
+                            <option value="新能源汽车">新能源汽车</option>
+                            <option value="芯片半导体">芯片半导体</option>
+                            <option value="医药医疗">医药医疗</option>
+                            <option value="5G通信">5G通信</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="date-input">选择日期：</label>
+                        <input type="date" id="date-input" class="form-control" value="2026-01-27">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="stock-input">个股代码（可选）：</label>
+                        <input type="text" id="stock-input" class="form-control" placeholder="例如: 000001">
+                    </div>
+
+                    <div class="button-group">
+                        <button id="btn-analyze-theme" class="btn btn-primary">
+                            分析题材
+                        </button>
+                        <button id="btn-compare" class="btn btn-success">
+                            对比分析
+                        </button>
+                        <button id="btn-clear" class="btn btn-secondary">
+                            清空结果
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 结果展示区域 -->
+            <section class="results-section">
+                <!-- 加载提示 -->
+                <div id="loading" class="loading" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>正在分析数据...</p>
+                </div>
+
+                <!-- 错误提示 -->
+                <div id="error-message" class="alert alert-error" style="display: none;"></div>
+
+                <!-- 题材分析结果 -->
+                <div id="theme-results" class="result-card" style="display: none;">
+                    <div class="card-header">
+                        <h3>📈 题材分析结果</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <span class="info-label">题材名称：</span>
+                                <span id="theme-name" class="info-value"></span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">分析日期：</span>
+                                <span id="theme-date" class="info-value"></span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">成分股数量：</span>
+                                <span id="theme-count" class="info-value"></span>
+                            </div>
+                            <div class="info-item highlight">
+                                <span class="info-label">题材位置：</span>
+                                <span id="theme-position" class="info-value large"></span>
+                            </div>
+                        </div>
+
+                        <!-- 位置百分比可视化 -->
+                        <div class="position-bar-container">
+                            <div class="position-bar">
+                                <div id="theme-position-bar" class="position-fill"></div>
+                            </div>
+                            <div class="position-labels">
+                                <span>0% (底部)</span>
+                                <span>50% (中位)</span>
+                                <span>100% (顶部)</span>
+                            </div>
+                        </div>
+
+                        <!-- 成分股列表 -->
+                        <div class="stocks-table-container">
+                            <h4>成分股列表（按涨停次数排序）</h4>
+                            <table id="stocks-table" class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>排名</th>
+                                        <th>股票代码</th>
+                                        <th>股票名称</th>
+                                        <th>涨停次数</th>
+                                        <th>当前价格</th>
+                                        <th>位置百分比</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="stocks-tbody">
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- 位置分布图表 -->
+                        <div class="chart-container">
+                            <h4>成分股位置分布</h4>
+                            <canvas id="position-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 对比分析结果 -->
+                <div id="compare-results" class="result-card" style="display: none;">
+                    <div class="card-header">
+                        <h3>🔍 个股与题材对比分析</h3>
+                    </div>
+                    <div class="card-body">
+                        <!-- 基本信息 -->
+                        <div class="compare-grid">
+                            <div class="compare-section">
+                                <h4>📍 个股信息</h4>
+                                <div class="info-list">
+                                    <div class="info-row">
+                                        <span class="label">股票代码：</span>
+                                        <span id="stock-code" class="value"></span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="label">股票名称：</span>
+                                        <span id="stock-name" class="value"></span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="label">当前价格：</span>
+                                        <span id="stock-price" class="value"></span>
+                                    </div>
+                                    <div class="info-row highlight">
+                                        <span class="label">位置百分比：</span>
+                                        <span id="stock-position" class="value large"></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="compare-section">
+                                <h4>📊 题材信息</h4>
+                                <div class="info-list">
+                                    <div class="info-row">
+                                        <span class="label">题材名称：</span>
+                                        <span id="compare-theme-name" class="value"></span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="label">成分股数量：</span>
+                                        <span id="compare-constituent-count" class="value"></span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="label">是否成分股：</span>
+                                        <span id="is-constituent" class="value"></span>
+                                    </div>
+                                    <div class="info-row highlight">
+                                        <span class="label">题材位置：</span>
+                                        <span id="compare-theme-position" class="value large"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 对比结果 -->
+                        <div class="comparison-result">
+                            <div class="result-highlight">
+                                <div class="result-item">
+                                    <span class="result-label">位置差异：</span>
+                                    <span id="position-diff" class="result-value"></span>
+                                </div>
+                                <div class="result-item">
+                                    <span class="result-label">相对强弱：</span>
+                                    <span id="relative-strength" class="result-value badge"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 对比图表 -->
+                        <div class="chart-container">
+                            <h4>位置对比</h4>
+                            <canvas id="compare-chart"></canvas>
+                        </div>
+
+                        <!-- 分析建议 -->
+                        <div id="analysis-advice" class="advice-box">
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- 页脚 -->
+        <footer class="footer">
+            <p>© 2026 股票数据研究系统 | 数据仅供参考，不构成投资建议</p>
+        </footer>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

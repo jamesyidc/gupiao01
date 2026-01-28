@@ -1,7 +1,7 @@
 """
 Flask API 接口
 """
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from datetime import datetime
 from analyzer import StockAnalyzer
@@ -17,17 +17,8 @@ app.config['JSON_SORT_KEYS'] = False
 
 @app.route('/', methods=['GET'])
 def index():
-    """API 根路径"""
-    return jsonify({
-        'message': '股票数据研究系统 API',
-        'version': '1.0.0',
-        'endpoints': {
-            'theme_top_stocks': '/api/theme/top-stocks',
-            'stock_position': '/api/stock/position',
-            'theme_position': '/api/theme/position',
-            'compare_analysis': '/api/analysis/compare'
-        }
-    })
+    """主页 - 显示可视化界面"""
+    return render_template('index.html')
 
 
 @app.route('/api/theme/top-stocks', methods=['GET'])
