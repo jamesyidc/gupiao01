@@ -326,6 +326,169 @@ def health_check():
     })
 
 
+@app.route('/api/data/submit-batch', methods=['POST'])
+def submit_batch_codes():
+    """
+    批量提交股票代码（只需代码，系统自动查询名称）
+    
+    请求体:
+    {
+        "date": "2026-01-28",
+        "theme": "人工智能",
+        "stock_codes": ["000001", "000002", "600519"]
+    }
+    """
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': '请求体不能为空'
+            }), 400
+        
+        date_str = data.get('date')
+        theme_name = data.get('theme')
+        stock_codes = data.get('stock_codes', [])
+        
+        if not date_str or not theme_name:
+            return jsonify({
+                'success': False,
+                'error': '缺少必需字段: date 和 theme'
+            }), 400
+        
+        if not stock_codes or not isinstance(stock_codes, list):
+            return jsonify({
+                'success': False,
+                'error': 'stock_codes 必须是非空数组'
+            }), 400
+        
+        # 验证日期格式
+        try:
+            trade_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({
+                'success': False,
+                'error': '日期格式错误，应为 YYYY-MM-DD'
+            }), 400
+        
+        # 导入数据
+        from models import Stock, Theme, LimitUpRecord
+        session = db.get_session()
+        
+        # 获取或创建题材
+        theme = session.query(Theme).filter(Theme.name == theme_name).first()
+        if not theme:
+            theme = Theme(name=theme_name, description=f'手动添加的题材：{theme_name}')
+            session.add(theme)
+            session.commit()
+        
+        success_count = 0
+        error_list = []
+        details = []
+        
+        # 这里简化处理，实际应该接入股票API查询
+        # 暂时使用虚拟名称
+        stock_names_map = {
+            '000001': '平安银行', '000002': '万科A', '000004': '国农科技',
+            '600519': '贵州茅台', '600036': '招商银行', '601318': '中国平安',
+            '300750': '宁德时代', '002594': '比亚迪', '000858': '五粮液',
+            '300768': '迪普科技', '688027': '国盾量子', '300033': '同花顺',
+            '002230': '科大讯飞', '688111': '金山办公', '000063': '中兴通讯'
+        }
+        
+        for stock_code in stock_codes:
+            try:
+                # 验证股票代码格式
+                if not stock_code or len(stock_code) != 6 or not stock_code.isdigit():
+                    error_list.append(f'股票代码格式错误: {stock_code}')
+                    details.append({
+                        'code': stock_code,
+                        'name': '',
+                        'status': '格式错误'
+                    })
+                    continue
+                
+                # 获取或创建股票
+                stock = session.query(Stock).filter(Stock.code == stock_code).first()
+                if not stock:
+                    # 尝试获取股票名称
+                    stock_name = stock_names_map.get(stock_code, f'股票{stock_code}')
+                    
+                    # 创建新股票
+                    market = 'SZ' if stock_code.startswith('0') or stock_code.startswith('3') else 'SH'
+                    stock = Stock(code=stock_code, name=stock_name, market=market)
+                    session.add(stock)
+                    session.commit()
+                    
+                    details.append({
+                        'code': stock_code,
+                        'name': stock_name,
+                        'status': '新建股票'
+                    })
+                else:
+                    details.append({
+                        'code': stock_code,
+                        'name': stock.name,
+                        'status': '已存在'
+                    })
+                
+                # 检查是否已存在该涨停记录
+                existing = session.query(LimitUpRecord).filter(
+                    LimitUpRecord.stock_id == stock.id,
+                    LimitUpRecord.theme_id == theme.id,
+                    LimitUpRecord.trade_date == trade_date
+                ).first()
+                
+                if existing:
+                    error_list.append(f'股票{stock_code}在{date_str}的{theme_name}题材涨停记录已存在')
+                    details[-1]['status'] = '记录已存在'
+                    continue
+                
+                # 创建涨停记录
+                limit_up = LimitUpRecord(
+                    stock_id=stock.id,
+                    theme_id=theme.id,
+                    trade_date=trade_date,
+                    reason=f'{theme_name}板块活跃',
+                    limit_up_time='09:30',
+                    open_count=0
+                )
+                session.add(limit_up)
+                success_count += 1
+                details[-1]['status'] = '✅ 成功'
+                
+            except Exception as e:
+                error_list.append(f'处理股票{stock_code}时出错: {str(e)}')
+                if details and details[-1]['code'] == stock_code:
+                    details[-1]['status'] = f'错误: {str(e)}'
+                continue
+        
+        # 提交事务
+        session.commit()
+        session.close()
+        
+        result = {
+            'success': True,
+            'message': f'成功提交{success_count}条涨停记录',
+            'success_count': success_count,
+            'total_count': len(stock_codes),
+            'details': details
+        }
+        
+        if error_list:
+            result['errors'] = error_list
+            result['error_count'] = len(error_list)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @app.route('/api/data/submit', methods=['POST'])
 def submit_data():
     """

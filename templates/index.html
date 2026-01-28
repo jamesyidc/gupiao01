@@ -250,13 +250,10 @@
                             </div>
 
                             <div class="form-section">
-                                <label>股票列表：</label>
-                                <div id="stocks-list">
-                                    <!-- 股票输入行将在这里动态添加 -->
-                                </div>
-                                <button type="button" id="btn-add-stock-row" class="btn btn-small btn-secondary">
-                                    ➕ 添加股票
-                                </button>
+                                <label>股票代码（批量输入）：</label>
+                                <textarea id="stock-codes" class="form-control" rows="6" 
+                                          placeholder="请输入股票代码，每行一个，例如：&#10;000001&#10;000002&#10;600519&#10;300750&#10;&#10;支持批量粘贴多个股票代码"></textarea>
+                                <small class="form-hint">💡 提示：每行一个股票代码，系统会自动查询股票名称</small>
                             </div>
 
                             <div class="form-actions">

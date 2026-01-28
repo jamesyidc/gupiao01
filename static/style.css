@@ -605,6 +605,29 @@ body {
     color: var(--text-primary);
 }
 
+.form-section textarea {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 1rem;
+    font-family: 'Courier New', monospace;
+    resize: vertical;
+}
+
+.form-section textarea:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.form-hint {
+    display: block;
+    margin-top: 8px;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
 #stocks-list {
     display: flex;
     flex-direction: column;
