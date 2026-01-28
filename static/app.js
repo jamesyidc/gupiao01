@@ -435,6 +435,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('btn-analyze-theme').addEventListener('click', analyzeTheme);
     document.getElementById('btn-compare').addEventListener('click', compareAnalysis);
     document.getElementById('btn-clear').addEventListener('click', clearResults);
+    document.getElementById('btn-add-data').addEventListener('click', openDataModal);
 
     // 回车键快捷操作
     document.getElementById('stock-input').addEventListener('keypress', function(e) {
@@ -443,5 +444,170 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // 模态框相关
+    document.getElementById('modal-close').addEventListener('click', closeDataModal);
+    document.getElementById('btn-cancel').addEventListener('click', closeDataModal);
+    document.getElementById('btn-add-stock-row').addEventListener('click', addStockInputRow);
+    document.getElementById('submit-form').addEventListener('submit', submitData);
+
+    // 点击模态框外部关闭
+    document.getElementById('data-modal').addEventListener('click', function(e) {
+        if (e.target.id === 'data-modal') {
+            closeDataModal();
+        }
+    });
+
+    // 设置默认日期为今天
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('submit-date').value = today;
+
+    // 初始化时添加一行股票输入
+    addStockInputRow();
+
     console.log('股票数据研究系统已加载');
 });
+
+// ============ 数据录入功能 ============
+
+let stockRowCounter = 0;
+
+function openDataModal() {
+    document.getElementById('data-modal').style.display = 'flex';
+    document.getElementById('submit-result').style.display = 'none';
+}
+
+function closeDataModal() {
+    document.getElementById('data-modal').style.display = 'none';
+    document.getElementById('submit-form').reset();
+    document.getElementById('stocks-list').innerHTML = '';
+    stockRowCounter = 0;
+    addStockInputRow();
+}
+
+function addStockInputRow() {
+    stockRowCounter++;
+    const stocksList = document.getElementById('stocks-list');
+    
+    const row = document.createElement('div');
+    row.className = 'stock-input-row';
+    row.id = `stock-row-${stockRowCounter}`;
+    
+    row.innerHTML = `
+        <input type="text" name="stock_code" placeholder="股票代码" required>
+        <input type="text" name="stock_name" placeholder="股票名称" required>
+        <input type="text" name="reason" placeholder="涨停原因（可选）">
+        <input type="text" name="limit_up_time" placeholder="09:30">
+        <button type="button" class="btn-remove" onclick="removeStockRow('stock-row-${stockRowCounter}')">×</button>
+    `;
+    
+    stocksList.appendChild(row);
+}
+
+function removeStockRow(rowId) {
+    const row = document.getElementById(rowId);
+    if (row) {
+        // 至少保留一行
+        const stocksList = document.getElementById('stocks-list');
+        if (stocksList.children.length > 1) {
+            row.remove();
+        } else {
+            showError('至少需要保留一只股票');
+        }
+    }
+}
+
+async function submitData(e) {
+    e.preventDefault();
+    
+    const date = document.getElementById('submit-date').value;
+    const theme = document.getElementById('submit-theme').value.trim();
+    
+    if (!date || !theme) {
+        alert('请填写日期和题材名称');
+        return;
+    }
+    
+    // 收集所有股票数据
+    const stockRows = document.querySelectorAll('.stock-input-row');
+    const stocks = [];
+    
+    for (let row of stockRows) {
+        const code = row.querySelector('input[name="stock_code"]').value.trim();
+        const name = row.querySelector('input[name="stock_name"]').value.trim();
+        const reason = row.querySelector('input[name="reason"]').value.trim();
+        const limitUpTime = row.querySelector('input[name="limit_up_time"]').value.trim();
+        
+        if (code && name) {
+            stocks.push({
+                code: code,
+                name: name,
+                reason: reason || `${theme}板块活跃`,
+                limit_up_time: limitUpTime || '09:30',
+                open_count: 0
+            });
+        }
+    }
+    
+    if (stocks.length === 0) {
+        alert('请至少添加一只股票');
+        return;
+    }
+    
+    // 提交数据
+    try {
+        showLoading();
+        
+        const response = await fetch(`${API_BASE_URL}/api/data/submit`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                date: date,
+                theme: theme,
+                stocks: stocks
+            })
+        });
+        
+        const result = await response.json();
+        hideLoading();
+        
+        // 显示结果
+        const resultDiv = document.getElementById('submit-result');
+        resultDiv.style.display = 'block';
+        
+        if (result.success) {
+            resultDiv.className = 'submit-success';
+            let message = `✅ ${result.message}`;
+            
+            if (result.errors && result.errors.length > 0) {
+                message += '\n\n⚠️ 部分错误：\n';
+                result.errors.forEach(err => {
+                    message += `• ${err}\n`;
+                });
+            }
+            
+            resultDiv.innerHTML = `<pre style="white-space: pre-wrap; margin: 0;">${message}</pre>`;
+            
+            // 3秒后关闭模态框
+            setTimeout(() => {
+                closeDataModal();
+                // 如果当前选择的题材和提交的一致，刷新分析
+                const currentTheme = document.getElementById('theme-select').value;
+                if (currentTheme === theme) {
+                    analyzeTheme();
+                }
+            }, 3000);
+        } else {
+            resultDiv.className = 'submit-error';
+            resultDiv.textContent = `❌ 提交失败：${result.error}`;
+        }
+        
+    } catch (error) {
+        hideLoading();
+        const resultDiv = document.getElementById('submit-result');
+        resultDiv.style.display = 'block';
+        resultDiv.className = 'submit-error';
+        resultDiv.textContent = `❌ 提交失败：${error.message}`;
+    }
+}

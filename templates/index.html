@@ -54,6 +54,9 @@
                         <button id="btn-compare" class="btn btn-success">
                             对比分析
                         </button>
+                        <button id="btn-add-data" class="btn btn-warning">
+                            ➕ 录入数据
+                        </button>
                         <button id="btn-clear" class="btn btn-secondary">
                             清空结果
                         </button>
@@ -216,6 +219,61 @@
                     </div>
                 </div>
             </section>
+
+            <!-- 数据录入模态框 -->
+            <div id="data-modal" class="modal" style="display: none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>📝 录入涨停数据</h3>
+                        <button id="modal-close" class="btn-close">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="submit-form">
+                            <div class="form-group">
+                                <label for="submit-date">涨停日期：</label>
+                                <input type="date" id="submit-date" class="form-control" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="submit-theme">题材名称：</label>
+                                <input type="text" id="submit-theme" class="form-control" 
+                                       placeholder="例如：人工智能、量子计算" required
+                                       list="theme-suggestions">
+                                <datalist id="theme-suggestions">
+                                    <option value="人工智能">
+                                    <option value="新能源汽车">
+                                    <option value="芯片半导体">
+                                    <option value="医药医疗">
+                                    <option value="5G通信">
+                                    <option value="量子计算">
+                                </datalist>
+                            </div>
+
+                            <div class="form-section">
+                                <label>股票列表：</label>
+                                <div id="stocks-list">
+                                    <!-- 股票输入行将在这里动态添加 -->
+                                </div>
+                                <button type="button" id="btn-add-stock-row" class="btn btn-small btn-secondary">
+                                    ➕ 添加股票
+                                </button>
+                            </div>
+
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary">
+                                    💾 提交数据
+                                </button>
+                                <button type="button" id="btn-cancel" class="btn btn-secondary">
+                                    取消
+                                </button>
+                            </div>
+                        </form>
+
+                        <!-- 提交结果提示 -->
+                        <div id="submit-result" style="display: none; margin-top: 20px;"></div>
+                    </div>
+                </div>
+            </div>
         </main>
 
         <!-- 页脚 -->
