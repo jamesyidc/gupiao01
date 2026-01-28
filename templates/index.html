@@ -253,10 +253,19 @@
                             </div>
 
                             <div class="form-section">
+                                <label>预期股票数量（防呆验证）：</label>
+                                <input type="number" id="expected-count" class="form-control" 
+                                       placeholder="例如：8（输入预期的股票数量，用于验证）" 
+                                       min="1" max="100">
+                                <small class="form-hint">💡 可选：输入预期的股票数量，系统将验证实际数量是否匹配</small>
+                            </div>
+
+                            <div class="form-section">
                                 <label>股票代码（批量输入）：</label>
                                 <textarea id="stock-codes" class="form-control" rows="6" 
                                           placeholder="请输入股票代码，每行一个，例如：&#10;000001&#10;000002&#10;600519&#10;300750&#10;&#10;支持批量粘贴多个股票代码"></textarea>
                                 <small class="form-hint">💡 提示：每行一个股票代码，系统会自动查询股票名称</small>
+                                <div id="stock-count-display" class="form-hint" style="margin-top: 5px; font-weight: bold;"></div>
                             </div>
 
                             <div class="form-actions">

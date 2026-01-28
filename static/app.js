@@ -472,6 +472,39 @@ document.addEventListener('DOMContentLoaded', function() {
     // 设置默认日期为今天
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('submit-date').value = today;
+    
+    // 实时显示股票代码数量
+    const stockCodesInput = document.getElementById('stock-codes');
+    const stockCountDisplay = document.getElementById('stock-count-display');
+    const expectedCountInput = document.getElementById('expected-count');
+    
+    function updateStockCount() {
+        const text = stockCodesInput.value.trim();
+        if (!text) {
+            stockCountDisplay.textContent = '';
+            return;
+        }
+        
+        const codes = text
+            .split('\n')
+            .map(line => line.trim())
+            .filter(line => line.length > 0)
+            .filter(code => /^\d{6}$/.test(code));
+        
+        const count = codes.length;
+        const expectedCount = expectedCountInput.value ? parseInt(expectedCountInput.value) : null;
+        
+        if (expectedCount && count !== expectedCount) {
+            stockCountDisplay.innerHTML = `<span style="color: #f59e0b;">⚠️ 实际数量：${count} 只（预期 ${expectedCount} 只）</span>`;
+        } else if (expectedCount) {
+            stockCountDisplay.innerHTML = `<span style="color: #10b981;">✅ 实际数量：${count} 只（匹配）</span>`;
+        } else {
+            stockCountDisplay.innerHTML = `<span style="color: #667eea;">📊 实际数量：${count} 只</span>`;
+        }
+    }
+    
+    stockCodesInput.addEventListener('input', updateStockCount);
+    expectedCountInput.addEventListener('input', updateStockCount);
 
     console.log('股票数据研究系统已加载');
 });
@@ -498,6 +531,7 @@ async function submitData(e) {
     const date = document.getElementById('submit-date').value;
     const theme = document.getElementById('submit-theme').value.trim();
     const stockCodesText = document.getElementById('stock-codes').value.trim();
+    const expectedCountInput = document.getElementById('expected-count').value;
     
     if (!date || !theme) {
         alert('请填写日期和题材名称');
@@ -521,6 +555,17 @@ async function submitData(e) {
         return;
     }
     
+    // 数量验证（防呆设计）
+    const expectedCount = expectedCountInput ? parseInt(expectedCountInput) : null;
+    const actualCount = stockCodes.length;
+    
+    if (expectedCount && expectedCount !== actualCount) {
+        const confirmMsg = `⚠️ 数量不匹配！\n\n预期：${expectedCount} 只股票\n实际：${actualCount} 只股票\n\n是否继续提交？`;
+        if (!confirm(confirmMsg)) {
+            return;
+        }
+    }
+    
     // 显示处理中的提示
     const resultDiv = document.getElementById('submit-result');
     resultDiv.style.display = 'block';
@@ -530,23 +575,24 @@ async function submitData(e) {
     try {
         showLoading();
         
-        // 构建股票数据（只需要代码，名称留空让系统自动查询）
-        const stocks = stockCodes.map(code => ({
-            code: code,
-            name: '',  // 空名称，让后端自动查询
-            reason: `${theme}板块活跃`
-        }));
+        // 构建请求数据
+        const requestData = {
+            date: date,
+            theme: theme,
+            stock_codes: stockCodes
+        };
+        
+        // 如果有预期数量，添加到请求中（严格验证）
+        if (expectedCount) {
+            requestData.expected_count = expectedCount;
+        }
         
         const response = await fetch(`${API_BASE_URL}/api/data/submit-batch`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                date: date,
-                theme: theme,
-                stock_codes: stockCodes
-            })
+            body: JSON.stringify(requestData)
         });
         
         const result = await response.json();
@@ -587,6 +633,16 @@ async function submitData(e) {
         } else {
             resultDiv.className = 'submit-error';
             resultDiv.textContent = `❌ 提交失败：${result.error}`;
+        }
+        
+    } catch (error) {
+        hideLoading();
+        const resultDiv = document.getElementById('submit-result');
+        resultDiv.style.display = 'block';
+        resultDiv.className = 'submit-error';
+        resultDiv.textContent = `❌ 提交失败：${error.message}`;
+    }
+}
         }
         
     } catch (error) {

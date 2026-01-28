@@ -336,7 +336,8 @@ def submit_batch_codes():
     {
         "date": "2026-01-28",
         "theme": "人工智能",
-        "stock_codes": ["000001", "000002", "600519"]
+        "stock_codes": ["000001", "000002", "600519"],
+        "expected_count": 3  # 可选：预期股票数量，用于防呆验证
     }
     """
     try:
@@ -351,6 +352,7 @@ def submit_batch_codes():
         date_str = data.get('date')
         theme_name = data.get('theme')
         stock_codes = data.get('stock_codes', [])
+        expected_count = data.get('expected_count')  # 预期数量（可选）
         
         if not date_str or not theme_name:
             return jsonify({
@@ -364,6 +366,17 @@ def submit_batch_codes():
                 'error': 'stock_codes 必须是非空数组'
             }), 400
         
+        # 数量验证（防呆设计）
+        actual_count = len(stock_codes)
+        if expected_count is not None:
+            if actual_count != expected_count:
+                return jsonify({
+                    'success': False,
+                    'error': f'股票数量不匹配！预期 {expected_count} 只，实际 {actual_count} 只',
+                    'expected_count': expected_count,
+                    'actual_count': actual_count
+                }), 400
+        
         # 验证日期格式
         try:
             trade_date = datetime.strptime(date_str, '%Y-%m-%d').date()
@@ -375,6 +388,7 @@ def submit_batch_codes():
         
         # 导入数据
         from models import Stock, Theme, LimitUpRecord, OperationLog
+        from stock_info import get_stock_name  # 导入股票名称查询工具
         import json
         session = db.get_session()
         
@@ -389,16 +403,6 @@ def submit_batch_codes():
         error_list = []
         details = []
         added_record_ids = []  # 记录成功添加的记录ID
-        
-        # 这里简化处理，实际应该接入股票API查询
-        # 暂时使用虚拟名称
-        stock_names_map = {
-            '000001': '平安银行', '000002': '万科A', '000004': '国农科技',
-            '600519': '贵州茅台', '600036': '招商银行', '601318': '中国平安',
-            '300750': '宁德时代', '002594': '比亚迪', '000858': '五粮液',
-            '300768': '迪普科技', '688027': '国盾量子', '300033': '同花顺',
-            '002230': '科大讯飞', '688111': '金山办公', '000063': '中兴通讯'
-        }
         
         for stock_code in stock_codes:
             try:
@@ -415,8 +419,8 @@ def submit_batch_codes():
                 # 获取或创建股票
                 stock = session.query(Stock).filter(Stock.code == stock_code).first()
                 if not stock:
-                    # 尝试获取股票名称
-                    stock_name = stock_names_map.get(stock_code, f'股票{stock_code}')
+                    # 使用 stock_info 模块自动获取股票名称
+                    stock_name = get_stock_name(stock_code)
                     
                     # 创建新股票
                     market = 'SZ' if stock_code.startswith('0') or stock_code.startswith('3') else 'SH'
