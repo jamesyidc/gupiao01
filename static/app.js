@@ -758,11 +758,8 @@ async function loadOperationLogs() {
                 let detailsHtml = '';
                 if (log.details) {
                     if (log.operation_type === 'add') {
-                        detailsHtml = `题材：${log.details.theme}, 日期：${log.details.date}, 添加 ${log.details.stock_count} 只股票`;
-                        // 添加股票代码列表
-                        if (log.details.stock_codes && log.details.stock_codes.length > 0) {
-                            detailsHtml += ` (${log.details.stock_codes.join(', ')})`;
-                        }
+                        // 只显示日期和题材，不展开股票代码
+                        detailsHtml = `<strong>${log.details.date}</strong> - ${log.details.theme} (${log.details.stock_count} 只股票)`;
                     } else if (log.operation_type === 'delete') {
                         detailsHtml = `删除：${log.details.stock_code} ${log.details.stock_name} (${log.details.theme_name}, ${log.details.trade_date})`;
                     }
