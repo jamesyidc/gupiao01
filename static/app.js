@@ -643,16 +643,6 @@ async function submitData(e) {
         resultDiv.textContent = `❌ 提交失败：${error.message}`;
     }
 }
-        }
-        
-    } catch (error) {
-        hideLoading();
-        const resultDiv = document.getElementById('submit-result');
-        resultDiv.style.display = 'block';
-        resultDiv.className = 'submit-error';
-        resultDiv.textContent = `❌ 提交失败：${error.message}`;
-    }
-}
 
 // ============ 日志管理功能 ============
 
