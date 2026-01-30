@@ -430,7 +430,50 @@ function clearResults() {
 }
 
 // 初始化
+// 加载题材列表
+async function loadThemes() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/data/themes`);
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+            const themeSelect = document.getElementById('theme-select');
+            // 清空现有选项（保留第一个"请选择题材"）
+            themeSelect.innerHTML = '<option value="">-- 请选择题材 --</option>';
+            
+            // 按题材名称排序
+            const sortedThemes = result.data.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
+            
+            // 添加所有题材
+            sortedThemes.forEach(theme => {
+                const option = document.createElement('option');
+                option.value = theme.name;
+                option.textContent = theme.name;
+                themeSelect.appendChild(option);
+            });
+            
+            // 同时更新数据录入模态框的题材建议列表
+            const themeSuggestions = document.getElementById('theme-suggestions');
+            if (themeSuggestions) {
+                themeSuggestions.innerHTML = '';
+                sortedThemes.forEach(theme => {
+                    const option = document.createElement('option');
+                    option.value = theme.name;
+                    themeSuggestions.appendChild(option);
+                });
+            }
+            
+            console.log(`已加载 ${sortedThemes.length} 个题材`);
+        }
+    } catch (error) {
+        console.error('加载题材列表失败:', error);
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    // 首先加载题材列表
+    loadThemes();
+    
     // 绑定按钮事件
     document.getElementById('btn-analyze-theme').addEventListener('click', analyzeTheme);
     document.getElementById('btn-compare').addEventListener('click', compareAnalysis);
