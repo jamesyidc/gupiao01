@@ -14,15 +14,20 @@ class StockAnalyzer:
     def __init__(self):
         self.session = db.get_session()
     
-    def get_theme_top_stocks(self, theme_name, end_date, lookback_days=365, top_n=15):
+    def get_theme_top_stocks(self, theme_name, end_date, lookback_days=365, top_n=None):
         """
         获取指定题材在过去一年内涨停次数最多的前N只股票
+        
+        新逻辑：
+        - 统计该题材所有涨停股票
+        - 取前20%的股票作为成分股
+        - 最少10只，最多20只
         
         Args:
             theme_name: 题材名称
             end_date: 截止日期
             lookback_days: 回溯天数，默认365天
-            top_n: 返回前N只股票，默认15
+            top_n: 返回前N只股票，如果为None则自动计算（前20%，10-20只）
             
         Returns:
             list: [(stock_code, stock_name, limit_up_count), ...]
@@ -38,7 +43,7 @@ class StockAnalyzer:
             return []
         
         # 统计每只股票的涨停次数
-        result = self.session.query(
+        all_stocks = self.session.query(
             Stock.code,
             Stock.name,
             func.count(LimitUpRecord.id).label('limit_up_count')
@@ -54,19 +59,29 @@ class StockAnalyzer:
             Stock.code, Stock.name
         ).order_by(
             func.count(LimitUpRecord.id).desc()
-        ).limit(top_n).all()
+        ).all()
         
+        # 如果没有指定top_n，则自动计算
+        if top_n is None:
+            total_count = len(all_stocks)
+            # 前20%
+            top_n = int(total_count * 0.2)
+            # 限制在10-20之间
+            top_n = max(10, min(20, top_n))
+        
+        result = all_stocks[:top_n]
         return [(r.code, r.name, r.limit_up_count) for r in result]
     
     def calculate_position_percentage(self, stock_code, target_date, lookback_periods=240):
         """
         计算个股在过去N个交易日的位置百分比
         
-        算法说明：
-        1. 获取过去240个交易日的收盘价
-        2. 找出最低价作为基准（0%）
-        3. 找出最高价作为顶部（100%）
-        4. 计算当前价格的位置百分比 = (当前价 - 最低价) / (最高价 - 最低价) * 100
+        算法说明（新逻辑）：
+        1. 获取241个交易日的数据（包括240天前的价格）
+        2. 第241天（最早的那天）的价格作为起始价格
+        3. 从第240天到第1天（当前）这240天内找最高价和最低价
+        4. 最低价 = 0%，最高价 = 100%
+        5. 计算当前价格（第1天）的位置百分比 = (当前价 - 最低价) / (最高价 - 最低价) * 100
         
         Args:
             stock_code: 股票代码
@@ -76,6 +91,7 @@ class StockAnalyzer:
         Returns:
             dict: {
                 'current_price': 当前价格,
+                'start_price': 起始价格（240天前）,
                 'lowest_price': 最低价,
                 'highest_price': 最高价,
                 'position_percent': 位置百分比,
@@ -90,7 +106,7 @@ class StockAnalyzer:
         if isinstance(target_date, str):
             target_date = datetime.strptime(target_date, '%Y-%m-%d').date()
         
-        # 获取过去N个交易日的价格数据
+        # 获取过去241个交易日的价格数据（多取1天作为起始点）
         prices = self.session.query(DailyPrice).filter(
             and_(
                 DailyPrice.stock_id == stock.id,
@@ -98,16 +114,27 @@ class StockAnalyzer:
             )
         ).order_by(
             DailyPrice.trade_date.desc()
-        ).limit(lookback_periods).all()
+        ).limit(lookback_periods + 1).all()
         
-        if not prices:
+        if len(prices) < 2:  # 至少需要2天的数据
             return None
         
         # 提取收盘价
         close_prices = [p.close_price for p in prices]
-        current_price = close_prices[0]  # 最新价格
-        lowest_price = min(close_prices)
-        highest_price = max(close_prices)
+        current_price = close_prices[0]  # 第1天（当前价格）
+        
+        # 如果有241天的数据，起始价格是第241天（最后一个）
+        # 计算区间是从第240天到第1天
+        if len(close_prices) >= lookback_periods + 1:
+            start_price = close_prices[lookback_periods]  # 第241天的价格
+            price_range = close_prices[:lookback_periods]  # 前240天的价格
+        else:
+            # 如果数据不足241天，用最后一天作为起始
+            start_price = close_prices[-1]
+            price_range = close_prices[:-1] if len(close_prices) > 1 else close_prices
+        
+        lowest_price = min(price_range)
+        highest_price = max(price_range)
         
         # 计算位置百分比
         if highest_price == lowest_price:
@@ -119,10 +146,11 @@ class StockAnalyzer:
             'stock_code': stock_code,
             'stock_name': stock.name,
             'current_price': round(current_price, 2),
+            'start_price': round(start_price, 2),
             'lowest_price': round(lowest_price, 2),
             'highest_price': round(highest_price, 2),
             'position_percent': round(position_percent, 2),
-            'available_periods': len(prices),
+            'available_periods': len(prices) - 1,  # 减1因为有一天是起始价格
             'target_date': target_date.strftime('%Y-%m-%d')
         }
     
